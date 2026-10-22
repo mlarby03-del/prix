@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e7468">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>ماسح الأسعار</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap">
+<style>
+/* Layout: caisse mobile. En-tête, deux onglets (vente / produits), barre de total fixe en bas. */
+:root{
+  --bg:#f3f6f6; --card:#ffffff; --ink:#142321; --muted:#5f7370; --line:#dfe7e6;
+  --main:#0e7468; --main-ink:#ffffff; --soft:#e4eeed; --danger:#b4372b; --focus:#0e7468;
+  --font:"Cairo",system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1918; --card:#172625; --ink:#e6f0ee; --muted:#93aaa6; --line:#264240;
+    --main:#2bb5a2; --main-ink:#06201c; --soft:#1f3634; --danger:#ef7d70; --focus:#2bb5a2;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1918; --card:#172625; --ink:#e6f0ee; --muted:#93aaa6; --line:#264240;
+  --main:#2bb5a2; --main-ink:#06201c; --soft:#1f3634; --danger:#ef7d70; --focus:#2bb5a2;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;
+  padding-block:0 110px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:560px;margin:0 auto}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 0 10px}
+header h1{font-size:21px;margin:0;font-weight:700}
+header .count{font-size:13px;color:var(--muted)}
+nav{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:12px;margin-bottom:14px}
+nav button{flex:1;padding:10px 8px;border:0;border-radius:9px;background:none;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+nav button.on{background:var(--card);color:var(--main)}
+.tab{display:none}.tab.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.btn{font:inherit;font-weight:600;border:0;border-radius:10px;padding:11px 16px;background:var(--main);color:var(--main-ink);cursor:pointer}
+.btn.sec{background:var(--soft);color:var(--ink)}
+.btn.red{background:var(--danger);color:#fff}
+.btn.big{width:100%;padding:14px;font-size:16px}
+input[type=text],input[type=number],input[type=search],textarea{font:inherit;font-size:16px;width:100%;padding:11px 12px;
+  border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+textarea{min-height:90px;direction:ltr;font-size:13px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.row{display:flex;gap:8px;align-items:center}
+.row input{flex:1;min-width:0}
+.note{font-size:13px;color:var(--muted);line-height:1.7;margin-top:8px}
+.item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .info{flex:1;min-width:0}
+.item .name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .sub{font-size:12.5px;color:var(--muted);direction:ltr;text-align:right}
+.item .unit{font-size:13px;color:var(--muted)}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
+.qty span{min-width:22px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.line{min-width:72px;text-align:left;font-weight:700;font-variant-numeric:tabular-nums}
+.x{border:0;background:none;color:var(--danger);font-size:18px;cursor:pointer;padding:4px 2px}
+.empty{text-align:center;color:var(--muted);padding:24px 8px;line-height:1.8}
+.bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:5}
+.bar .in{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.bar .tot{flex:1}
+.bar small{display:block;color:var(--muted);font-size:12.5px}
+.bar b{font-size:27px;color:var(--main);font-variant-numeric:tabular-nums}
+.modal{position:fixed;inset:0;background:rgba(5,15,14,.6);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.modal.on{display:flex}
+.sheet{background:var(--card);width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .code{direction:ltr;text-align:right;color:var(--muted);font-size:14px;margin-bottom:6px}
+.sheet label{display:block;font-size:13.5px;color:var(--muted);margin:10px 0 4px}
+.acts{display:flex;gap:8px;margin-top:14px}.acts .btn{flex:1}
+#toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90%;text-align:center}
+#toast.on{opacity:.96}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#photoLabel{display:block;text-align:center;cursor:pointer}
+.thumb{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--soft);flex:none}
+.pvrow{display:flex;align-items:center;gap:12px;margin:8px 0 2px}
+#mPv{width:72px;height:72px;border-radius:10px;object-fit:cover;background:var(--soft);flex:none}
+#mPhotoLbl{cursor:pointer;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>ماسح الأسعار</h1>
+  <div class="count" id="hdrCount"></div>
+</header>
+
+<nav>
+  <button class="on" data-tab="sale">البيع</button>
+  <button data-tab="prods">المنتوجات</button>
+</nav>
+
+<section class="tab on" id="tab-sale">
+  <div class="card">
+    <label id="photoLabel" class="btn big" for="photo">صوّر الكود بار</label>
+    <input type="file" id="photo" accept="image/*" hidden>
+    <div class="note">تختار بين الكاميرا أو صورة محفوظة في المعرض. الكود بار لازم يكون واضح في الصورة.</div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <input type="text" id="manual" inputmode="numeric" autocomplete="off" placeholder="أو اكتب الكود هنا" style="direction:ltr;text-align:right">
+      <button class="btn" id="btnAddManual">إضافة</button>
+    </div>
+    <div class="note">قارئ باركود (USB أو بلوتوث) يكتب الكود هنا وحدو.</div>
+  </div>
+
+  <div class="card"><div id="cart"></div></div>
+</section>
+
+<section class="tab" id="tab-prods">
+  <div class="card">
+    <label class="btn big" for="photoNew" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px">منتوج جديد من صورة</label>
+    <input type="file" id="photoNew" accept="image/*" hidden>
+    <input type="search" id="search" placeholder="بحث بالاسم أو بالكود">
+    <div class="tools">
+      <button class="btn sec" id="btnNewProd">إضافة يدوية</button>
+      <button class="btn sec" id="btnExport">نسخة احتياطية</button>
+      <button class="btn sec" id="btnImport">استرجاع</button>
+    </div>
+    <div id="backupBox" hidden>
+      <textarea id="backupText" placeholder="الصق هنا نص النسخة الاحتياطية ثم اضغط استرجاع"></textarea>
+      <div class="note">انسخ هاد النص واحفظو في مكان آمن (ملاحظات، واتساب لنفسك). للاسترجاع الصقو هنا واضغط «استرجاع».</div>
+    </div>
+  </div>
+  <div class="card"><div id="plist"></div></div>
+</section>
+</div>
+
+<div class="bar" id="bar">
+  <div class="in">
+    <div class="tot"><small id="totLabel">المجموع</small><b id="total">0 دج</b></div>
+    <button class="btn sec" id="btnClear">فاتورة جديدة</button>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h3 id="mTitle">منتوج جديد</h3>
+    <div class="code" id="mCodeShow"></div>
+    <div class="pvrow">
+      <img id="mPv" alt="" hidden>
+      <label id="mPhotoLbl" class="btn sec" for="mPhoto">صورة المنتوج</label>
+      <input type="file" id="mPhoto" accept="image/*" hidden>
+    </div>
+    <div id="mCodeBox" hidden>
+      <label for="mCode">الكود</label>
+      <input type="text" id="mCode" inputmode="numeric" style="direction:ltr;text-align:right">
+    </div>
+    <label for="mName">الاسم (اختياري)</label>
+    <input type="text" id="mName" placeholder="مثال: حليب 1 لتر">
+    <label for="mPrice">السعر (دج)</label>
+    <input type="number" id="mPrice" inputmode="decimal" min="0" step="any" placeholder="0">
+    <div class="acts">
+      <button class="btn sec" id="mCancel">إلغاء</button>
+      <button class="btn" id="mSave">حفظ</button>
+    </div>
+    <div class="acts" id="mDelRow" hidden>
+      <button class="btn red" id="mDelete">حذف المنتوج</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+(function(){
+'use strict';
+try{ document.documentElement.setAttribute('dir','rtl'); document.documentElement.setAttribute('lang','ar'); }catch(e){}
+
+/* ---------- التخزين ---------- */
+var KP='pos_products_v1', KC='pos_cart_v1';
+function load(k,def){ try{ var v=JSON.parse(localStorage.getItem(k)); return v||def; }catch(e){ return def; } }
+function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+var products = load(KP,{});
+var cart     = load(KC,[]);
+
+/* ---------- أدوات ---------- */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function r2(n){ return Math.round(n*100)/100; }
+function fmt(n){ return r2(n).toLocaleString('en-US',{maximumFractionDigits:2})+' دج'; }
+function norm(c){ return String(c||'').trim().replace(/\s+/g,''); }
+var toastT;
+function toast(msg){ var t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');},2200); }
+function beep(){
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    var a=new AC(), o=a.createOscillator(), g=a.createGain();
+    o.type='sine'; o.frequency.value=1100; g.gain.value=.15; o.connect(g); g.connect(a.destination);
+    o.start(); setTimeout(function(){o.stop(); a.close();},110);
+  }catch(e){}
+  try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
+}
+/* تأكيد بضغطتين (confirm() ما يخدمش هنا) */
+function twoStep(btn,askLabel,fn){
+  if(btn.dataset.armed){ clearTimeout(+btn.dataset.armed); var o=btn.dataset.orig; delete btn.dataset.armed; btn.textContent=o; fn(); return; }
+  btn.dataset.orig=btn.textContent; btn.textContent=askLabel;
+  btn.dataset.armed=String(setTimeout(function(){ btn.textContent=btn.dataset.orig; delete btn.dataset.armed; },3000));
+}
+
+/* ---------- السلة ---------- */
+function addToCart(code){
+  var f=null; for(var i=0;i<cart.length;i++){ if(cart[i].code===code){ f=cart[i]; break; } }
+  if(f) f.qty+=1; else cart.push({code:code,qty:1});
+  save(KC,cart); renderCart();
+}
+function total(){
+  var t=0; cart.forEach(function(it){ var p=products[it.code]; if(p) t+=p.price*it.qty; }); return r2(t);
+}
+function thumb(p){ return (p && p.img) ? '<img class="thumb" src="'+p.img+'" alt="">' : ''; }
+/* صورة مصغرة من ملف (أقصى 220px) باش ما تثقلش الذاكرة */
+async function makeThumb(file){
+  try{
+    var bmp=await createImageBitmap(file), m=220, k=Math.min(1,m/Math.max(bmp.width,bmp.height));
+    var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(bmp.width*k)); c.height=Math.max(1,Math.round(bmp.height*k));
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    return c.toDataURL('image/jpeg',0.72);
+  }catch(e){ return ''; }
+}
+function renderCart(){
+  var box=$('cart');
+  if(!cart.length){ box.innerHTML='<div class="empty">السلة خاوية.<br>صوّر كود بار أو اكتبو باش تبدا.</div>'; }
+  else{
+    box.innerHTML=cart.map(function(it,idx){
+      var p=products[it.code]||{name:'',price:0};
+      return '<div class="item">'+thumb(p)+
+        '<div class="info"><div class="name">'+esc(p.name||'منتوج بلا اسم')+'</div>'+
+        '<div class="sub">'+esc(it.code)+'</div>'+
+        '<div class="unit">'+fmt(p.price)+'</div></div>'+
+        '<div class="qty"><button data-a="minus" data-i="'+idx+'" aria-label="نقص">−</button><span>'+it.qty+'</span><button data-a="plus" data-i="'+idx+'" aria-label="زيد">+</button></div>'+
+        '<div class="line">'+fmt(p.price*it.qty)+'</div>'+
+        '<button class="x" data-a="del" data-i="'+idx+'" aria-label="حذف">✕</button></div>';
+    }).join('');
+  }
+  var n=0; cart.forEach(function(it){n+=it.qty;});
+  $('total').textContent=fmt(total());
+  $('totLabel').textContent='المجموع ('+n+' قطعة)';
+  $('hdrCount').textContent=Object.keys(products).length+' منتوج محفوظ';
+}
+$('cart').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  var i=+b.dataset.i, a=b.dataset.a; if(!cart[i]) return;
+  if(a==='plus') cart[i].qty+=1;
+  else if(a==='minus'){ cart[i].qty-=1; if(cart[i].qty<=0) cart.splice(i,1); }
+  else if(a==='del') cart.splice(i,1);
+  save(KC,cart); renderCart();
+});
+$('btnClear').addEventListener('click',function(){
+  if(!cart.length) return;
+  twoStep(this,'تأكيد؟',function(){ cart=[]; save(KC,cart); renderCart(); toast('فاتورة جديدة'); });
+});
+
+/* ---------- معالجة الكود ---------- */
+var modalOpen=false;
+function onCode(raw,img){
+  var code=norm(raw); if(!code) return;
+  beep();
+  if(products[code]){ addToCart(code); toast((products[code].name||code)+' — '+fmt(products[code].price)); }
+  else openModal({code:code,isNew:true,addAfter:true,img:img||''});
+}
+$('btnAddManual').addEventListener('click',function(){ var v=$('manual').value; $('manual').value=''; onCode(v); });
+$('manual').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); var v=this.value; this.value=''; onCode(v); } });
+
+/* ---------- قراءة الباركود من صورة ---------- */
+async function decodeNative(file){
+  if(!('BarcodeDetector' in window)) return null;
+  var bmp=await createImageBitmap(file);
+  var det=new BarcodeDetector();
+  var res=await det.detect(bmp);
+  return res.length ? res[0].rawValue : null;
+}
+async function decodeZX(file){
+  if(!window.ZXing) return null;
+  var url=URL.createObjectURL(file);
+  try{
+    var reader=new ZXing.BrowserMultiFormatReader();
+    var r=await reader.decodeFromImageUrl(url);
+    return r ? r.getText() : null;
+  }finally{ URL.revokeObjectURL(url); }
+}
+$('photo').addEventListener('change',async function(){
+  var f=this.files && this.files[0]; this.value=''; if(!f) return;
+  toast('نقرأ الكود…');
+  var code=null;
+  try{ code=await decodeNative(f); }catch(e){}
+  if(!code){ try{ code=await decodeZX(f); }catch(e){} }
+  var img=await makeThumb(f);
+  if(code) onCode(code,img);
+  else{
+    toast('ما قريناش الكود. اكتبو يدوياً وتتحفظ الصورة مع المنتوج.');
+    openModal({code:'',isNew:true,addAfter:true,img:img});
+  }
+});
+/* تصوير منتوج جديد من تبويب المنتوجات (بلا إضافة للسلة) */
+$('photoNew').addEventListener('change',async function(){
+  var f=this.files && this.files[0]; this.value=''; if(!f) return;
+  toast('نقرأ الكود…');
+  var code=null;
+  try{ code=await decodeNative(f); }catch(e){}
+  if(!code){ try{ code=await decodeZX(f); }catch(e){} }
+  var img=await makeThumb(f);
+  code=norm(code);
+  if(code){
+    openModal({code:code,isNew:!products[code],addAfter:false,img:img||undefined});
+  }else{
+    toast('ما قريناش الكود. اكتبو يدوياً وتتحفظ الصورة مع المنتوج.');
+    openModal({code:'',isNew:true,addAfter:false,img:img});
+  }
+});
+$('mPhoto').addEventListener('change',async function(){
+  var f=this.files && this.files[0]; this.value=''; if(!f||!editing) return;
+  var t=await makeThumb(f);
+  if(t){ editing.img=t; showPv(t); }
+});
+function showPv(src){ var pv=$('mPv'); if(src){ pv.src=src; pv.hidden=false; } else { pv.removeAttribute('src'); pv.hidden=true; } $('mPhotoLbl').textContent = src ? 'بدّل الصورة' : 'صورة المنتوج'; }
+
+/* ---------- نافذة المنتوج ---------- */
+var editing=null;
+function openModal(opt){
+  editing=opt; modalOpen=true;
+  var p=products[opt.code]||{};
+  if(opt.img===undefined) opt.img=p.img||'';
+  showPv(opt.img);
+  $('mTitle').textContent = opt.isNew ? (opt.code?'منتوج جديد — دخّل السعر':'منتوج جديد') : 'تعديل المنتوج';
+  $('mCodeShow').textContent = opt.code ? 'الكود: '+opt.code : '';
+  $('mCodeShow').hidden = !opt.code;
+  $('mCodeBox').hidden = !!opt.code;
+  $('mCode').value='';
+  $('mName').value = p.name||'';
+  $('mPrice').value = (p.price!==undefined)? p.price : '';
+  $('mDelRow').hidden = !(!opt.isNew && opt.code);
+  $('modal').classList.add('on');
+  setTimeout(function(){ (opt.code? $('mPrice'):$('mCode')).focus(); },80);
+}
+function closeModal(){ $('modal').classList.remove('on'); modalOpen=false; editing=null; }
+$('mCancel').addEventListener('click',closeModal);
+$('modal').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
+$('mSave').addEventListener('click',function(){
+  if(!editing) return;
+  var code = editing.code || norm($('mCode').value);
+  if(!code){ toast('دخّل الكود'); return; }
+  var price = parseFloat($('mPrice').value);
+  if(isNaN(price) || price<0){ toast('دخّل سعر صحيح'); return; }
+  var rec={ name:$('mName').value.trim(), price:r2(price) };
+  if(editing.img) rec.img=editing.img;
+  products[code]=rec;
+  save(KP,products);
+  var add=editing.addAfter;
+  closeModal();
+  if(add) addToCart(code);
+  renderCart(); renderProducts();
+  toast('تحفظ');
+});
+$('mDelete').addEventListener('click',function(){
+  if(!editing||!editing.code) return;
+  var c=editing.code;
+  twoStep(this,'اضغط مرة أخرى للحذف',function(){
+    delete products[c]; cart=cart.filter(function(it){return it.code!==c;});
+    save(KP,products); save(KC,cart); closeModal(); renderCart(); renderProducts();
+  });
+});
+
+/* ---------- قائمة المنتوجات ---------- */
+function renderProducts(){
+  var q=$('search').value.trim().toLowerCase();
+  var keys=Object.keys(products).filter(function(c){
+    return !q || c.toLowerCase().indexOf(q)>-1 || (products[c].name||'').toLowerCase().indexOf(q)>-1;
+  }).sort(function(a,b){ return (products[a].name||a).localeCompare(products[b].name||b,'ar'); });
+  var box=$('plist');
+  if(!keys.length){ box.innerHTML='<div class="empty">'+(q?'ما كاين حتى نتيجة.':'ما كاين حتى منتوج محفوظ.<br>كي تمسح كود جديد تدخّل سعرو ويتحفظ.')+'</div>'; return; }
+  box.innerHTML=keys.map(function(c){
+    var p=products[c];
+    return '<div class="item" data-c="'+esc(c)+'" style="cursor:pointer">'+thumb(p)+
+      '<div class="info"><div class="name">'+esc(p.name||'منتوج بلا اسم')+'</div><div class="sub">'+esc(c)+'</div></div>'+
+      '<div class="line">'+fmt(p.price)+'</div></div>';
+  }).join('');
+}
+$('plist').addEventListener('click',function(e){
+  var it=e.target.closest('.item'); if(!it) return;
+  openModal({code:it.dataset.c,isNew:false,addAfter:false});
+});
+$('search').addEventListener('input',renderProducts);
+$('btnNewProd').addEventListener('click',function(){ openModal({code:'',isNew:true,addAfter:false}); });
+
+/* ---------- نسخة احتياطية ---------- */
+$('btnExport').addEventListener('click',async function(){
+  var txt=JSON.stringify(products,null,2);
+  $('backupBox').hidden=false; $('backupText').value=txt;
+  try{
+    var dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if(dl){ await dl.save({filename:'produits.json',data:txt}); toast('تحفظ الملف'); return; }
+  }catch(e){}
+  try{ await navigator.clipboard.writeText(txt); toast('تنسخ النص'); }catch(e){ $('backupText').select(); toast('انسخ النص لي ظهر'); }
+});
+$('btnImport').addEventListener('click',function(){
+  var box=$('backupBox');
+  if(box.hidden || !$('backupText').value.trim()){ box.hidden=false; $('backupText').value=''; $('backupText').focus(); toast('الصق النص ثم اضغط استرجاع مرة أخرى'); return; }
+  try{
+    var obj=JSON.parse($('backupText').value), n=0;
+    Object.keys(obj).forEach(function(c){
+      var p=obj[c];
+      if(p && typeof p.price==='number' && isFinite(p.price) && p.price>=0){
+        var rec={name:String(p.name||'').slice(0,120),price:r2(p.price)};
+        if(typeof p.img==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(p.img)) rec.img=p.img;
+        products[norm(c)]=rec; n++;
+      }
+    });
+    save(KP,products); renderProducts(); renderCart(); toast('تسترجعو '+n+' منتوج');
+  }catch(e){ toast('النص ماشي صحيح'); }
+});
+
+/* ---------- التبويبات ---------- */
+document.querySelectorAll('nav button').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('nav button').forEach(function(x){x.classList.toggle('on',x===b);});
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('on',t.id==='tab-'+b.dataset.tab);});
+    $('bar').hidden = b.dataset.tab!=='sale';
+    if(b.dataset.tab==='prods') renderProducts();
+  });
+});
+
+renderCart(); renderProducts();
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+</script>
+</body>
+</html>

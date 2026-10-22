@@ -1,8 +1,8 @@
-const CACHE = 'pos-v3';
+const CACHE = 'pos-v4';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon.svg'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => Promise.all(FILES.map(f => c.add(f).catch(() => {})))));
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(FILES.map(f => c.add(new Request(f, {cache: 'reload'})).catch(() => {})))));
   self.skipWaiting();
 });
 
@@ -13,15 +13,16 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// الشبكة أولاً (باش التحديثات توصل)، والذاكرة كاحتياط بلا أنترنت
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       if (res && (res.ok || res.type === 'opaque')) {
         const cp = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, cp));
       }
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
   );
 });

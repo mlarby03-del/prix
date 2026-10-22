@@ -86,7 +86,8 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
   padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90%;text-align:center}
 #toast.on{opacity:.96}
 .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-#photoLabel{display:block;text-align:center;cursor:pointer}
+.pick{display:flex;gap:8px}
+.pick label{flex:1;text-align:center;cursor:pointer;width:auto}
 .thumb{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--soft);flex:none}
 .pvrow{display:flex;align-items:center;gap:12px;margin:8px 0 2px}
 #mPv{width:72px;height:72px;border-radius:10px;object-fit:cover;background:var(--soft);flex:none}
@@ -107,7 +108,11 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
 
 <section class="tab on" id="tab-sale">
   <div class="card">
-    <label id="photoLabel" class="btn big" for="photo">صوّر الكود بار</label>
+    <div class="pick">
+      <label class="btn big" for="photoCam">صوّر بالكاميرا</label>
+      <label class="btn big sec" for="photo">اختر صورة</label>
+    </div>
+    <input type="file" id="photoCam" accept="image/*" capture="environment" hidden>
     <input type="file" id="photo" accept="image/*" hidden>
     <div class="note">تختار بين الكاميرا أو صورة محفوظة في المعرض. الكود بار لازم يكون واضح في الصورة.</div>
   </div>
@@ -125,7 +130,11 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
 
 <section class="tab" id="tab-prods">
   <div class="card">
-    <label class="btn big" for="photoNew" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px">منتوج جديد من صورة</label>
+    <div class="pick" style="margin-bottom:10px">
+      <label class="btn big" for="photoNewCam">منتوج جديد: صوّر</label>
+      <label class="btn big sec" for="photoNew">اختر صورة</label>
+    </div>
+    <input type="file" id="photoNewCam" accept="image/*" capture="environment" hidden>
     <input type="file" id="photoNew" accept="image/*" hidden>
     <input type="search" id="search" placeholder="بحث بالاسم أو بالكود">
     <div class="tools">
@@ -155,7 +164,11 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
     <div class="code" id="mCodeShow"></div>
     <div class="pvrow">
       <img id="mPv" alt="" hidden>
-      <label id="mPhotoLbl" class="btn sec" for="mPhoto">صورة المنتوج</label>
+      <div class="pick" style="flex:1">
+        <label class="btn sec" for="mPhotoCam">صوّر</label>
+        <label id="mPhotoLbl" class="btn sec" for="mPhoto">اختر صورة</label>
+      </div>
+      <input type="file" id="mPhotoCam" accept="image/*" capture="environment" hidden>
       <input type="file" id="mPhoto" accept="image/*" hidden>
     </div>
     <div id="mCodeBox" hidden>
@@ -295,7 +308,7 @@ async function decodeZX(file){
     return r ? r.getText() : null;
   }finally{ URL.revokeObjectURL(url); }
 }
-$('photo').addEventListener('change',async function(){
+var salePhoto=async function(){
   var f=this.files && this.files[0]; this.value=''; if(!f) return;
   toast('نقرأ الكود…');
   var code=null;
@@ -307,9 +320,11 @@ $('photo').addEventListener('change',async function(){
     toast('ما قريناش الكود. اكتبو يدوياً وتتحفظ الصورة مع المنتوج.');
     openModal({code:'',isNew:true,addAfter:true,img:img});
   }
-});
+};
+$('photo').addEventListener('change',salePhoto);
+$('photoCam').addEventListener('change',salePhoto);
 /* تصوير منتوج جديد من تبويب المنتوجات (بلا إضافة للسلة) */
-$('photoNew').addEventListener('change',async function(){
+var newPhoto=async function(){
   var f=this.files && this.files[0]; this.value=''; if(!f) return;
   toast('نقرأ الكود…');
   var code=null;
@@ -323,13 +338,17 @@ $('photoNew').addEventListener('change',async function(){
     toast('ما قريناش الكود. اكتبو يدوياً وتتحفظ الصورة مع المنتوج.');
     openModal({code:'',isNew:true,addAfter:false,img:img});
   }
-});
-$('mPhoto').addEventListener('change',async function(){
+};
+$('photoNew').addEventListener('change',newPhoto);
+$('photoNewCam').addEventListener('change',newPhoto);
+var modalPhoto=async function(){
   var f=this.files && this.files[0]; this.value=''; if(!f||!editing) return;
   var t=await makeThumb(f);
   if(t){ editing.img=t; showPv(t); }
-});
-function showPv(src){ var pv=$('mPv'); if(src){ pv.src=src; pv.hidden=false; } else { pv.removeAttribute('src'); pv.hidden=true; } $('mPhotoLbl').textContent = src ? 'بدّل الصورة' : 'صورة المنتوج'; }
+};
+$('mPhoto').addEventListener('change',modalPhoto);
+$('mPhotoCam').addEventListener('change',modalPhoto);
+function showPv(src){ var pv=$('mPv'); if(src){ pv.src=src; pv.hidden=false; } else { pv.removeAttribute('src'); pv.hidden=true; } $('mPhotoLbl').textContent = src ? 'بدّل من المعرض' : 'اختر صورة'; }
 
 /* ---------- نافذة المنتوج ---------- */
 var editing=null;

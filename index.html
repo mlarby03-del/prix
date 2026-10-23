@@ -86,6 +86,10 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
   padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90%;text-align:center}
 #toast.on{opacity:.96}
 .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#camWrap{position:relative;border-radius:12px;overflow:hidden;background:#000;margin-bottom:10px}
+#video{width:100%;max-height:42vh;object-fit:cover;display:block}
+#aim{position:absolute;inset:22% 10%;border:3px solid rgba(255,255,255,.85);border-radius:10px;pointer-events:none;box-shadow:0 0 0 999px rgba(0,0,0,.28)}
+#camHint{position:absolute;bottom:0;left:0;right:0;padding:8px 10px;text-align:center;color:#fff;font-size:16px;font-weight:700;background:rgba(0,0,0,.55)}
 .pick{display:flex;gap:8px}
 .pick label{flex:1;text-align:center;cursor:pointer;width:auto}
 .thumb{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--soft);flex:none}
@@ -108,13 +112,19 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
 
 <section class="tab on" id="tab-sale">
   <div class="card">
+    <div id="camWrap" hidden>
+      <video id="video" playsinline muted></video>
+      <div id="aim"></div>
+      <div id="camHint">مرّر الكود بار قدام الكاميرا</div>
+    </div>
+    <button class="btn big" id="btnLive" style="width:100%;margin-bottom:8px">مسح مباشر بالكاميرا</button>
     <div class="pick">
-      <label class="btn big" for="photoCam">صوّر بالكاميرا</label>
+      <label class="btn big sec" for="photoCam">صوّر بالكاميرا</label>
       <label class="btn big sec" for="photo">اختر صورة</label>
     </div>
     <input type="file" id="photoCam" accept="image/*" capture="environment" hidden>
     <input type="file" id="photo" accept="image/*" hidden>
-    <div class="note">تختار بين الكاميرا أو صورة محفوظة في المعرض. الكود بار لازم يكون واضح في الصورة.</div>
+    <div class="note">«مسح مباشر» يقرا الكود وحدو وتظهر لك الأسعار بلا ضغط. أو صوّر، أو اختر صورة محفوظة.</div>
   </div>
 
   <div class="card">
@@ -281,15 +291,60 @@ $('btnClear').addEventListener('click',function(){
 });
 
 /* ---------- معالجة الكود ---------- */
-var modalOpen=false;
+var modalOpen=false, lastT=0, lastCode='';
 function onCode(raw,img){
   var code=norm(raw); if(!code) return;
   beep();
-  if(products[code]){ addToCart(code); toast((products[code].name||code)+' — '+fmt(products[code].price)); }
+  if(products[code]){ addToCart(code); var info=(products[code].name||code)+' — '+fmt(products[code].price); toast(info); $('camHint').textContent=info; }
   else openModal({code:code,isNew:true,addAfter:true,img:img||''});
 }
 $('btnAddManual').addEventListener('click',function(){ var v=$('manual').value; $('manual').value=''; onCode(v); });
 $('manual').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); var v=this.value; this.value=''; onCode(v); } });
+
+
+/* ---------- مسح مباشر بالكاميرا ---------- */
+var stream=null, detector=null, zxReader=null, live=false;
+async function startLive(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('الكاميرا المباشرة غير متاحة هنا. استعمل «صوّر بالكاميرا».'); return; }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  }catch(e){
+    toast(e && e.name==='NotAllowedError' ? 'ما عطيتش إذن الكاميرا' : 'الكاميرا المباشرة غير متاحة هنا. استعمل «صوّر بالكاميرا».');
+    return;
+  }
+  var v=$('video'); v.srcObject=stream; try{ await v.play(); }catch(e){}
+  $('camWrap').hidden=false; $('btnLive').textContent='أغلق الكاميرا';
+  $('camHint').textContent='مرّر الكود بار قدام الكاميرا';
+  live=true;
+  if('BarcodeDetector' in window){ try{ detector=new BarcodeDetector(); }catch(e){ detector=null; } }
+  if(detector){ loopNative(); }
+  else if(window.ZXing){
+    try{
+      zxReader=new ZXing.BrowserMultiFormatReader();
+      zxReader.decodeFromStream(stream,v,function(res){ if(res) liveCode(res.getText()); });
+    }catch(e){ toast('القارئ المباشر ما خدمش. استعمل الصورة.'); stopLive(); }
+  }else{ toast('القارئ المباشر غير متاح. استعمل الصورة.'); stopLive(); }
+}
+function stopLive(){
+  live=false;
+  if(zxReader){ try{ zxReader.reset(); }catch(e){} zxReader=null; }
+  if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream=null; }
+  $('video').srcObject=null; $('camWrap').hidden=true; $('btnLive').textContent='مسح مباشر بالكاميرا';
+}
+async function loopNative(){
+  if(!live || !detector) return;
+  if(!modalOpen && $('video').readyState>=2){
+    try{ var r=await detector.detect($('video')); if(r.length) liveCode(r[0].rawValue); }catch(e){}
+  }
+  setTimeout(loopNative,150);
+}
+function liveCode(raw){
+  var c=norm(raw), now=Date.now(); if(!c || modalOpen) return;
+  if(c===lastCode && now-lastT<2000){ lastT=now; return; }
+  lastCode=c; lastT=now; onCode(c);
+}
+$('btnLive').addEventListener('click',function(){ live ? stopLive() : startLive(); });
+document.addEventListener('visibilitychange',function(){ if(document.hidden && live) stopLive(); });
 
 /* ---------- قراءة الباركود من صورة ---------- */
 async function decodeNative(file){
@@ -368,7 +423,7 @@ function openModal(opt){
   $('modal').classList.add('on');
   setTimeout(function(){ (opt.code? $('mPrice'):$('mCode')).focus(); },80);
 }
-function closeModal(){ $('modal').classList.remove('on'); modalOpen=false; editing=null; }
+function closeModal(){ $('modal').classList.remove('on'); modalOpen=false; editing=null; lastT=Date.now(); }
 $('mCancel').addEventListener('click',closeModal);
 $('modal').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
 $('mSave').addEventListener('click',function(){
@@ -451,6 +506,7 @@ document.querySelectorAll('nav button').forEach(function(b){
     document.querySelectorAll('nav button').forEach(function(x){x.classList.toggle('on',x===b);});
     document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('on',t.id==='tab-'+b.dataset.tab);});
     $('bar').hidden = b.dataset.tab!=='sale';
+    if(b.dataset.tab!=='sale' && live) stopLive();
     if(b.dataset.tab==='prods') renderProducts();
   });
 });

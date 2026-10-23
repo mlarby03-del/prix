@@ -1,4 +1,4 @@
-const CACHE = 'pos-v4';
+const CACHE = 'pos-v5';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon.svg'];
 
 self.addEventListener('install', e => {

@@ -96,6 +96,18 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
 .pvrow{display:flex;align-items:center;gap:12px;margin:8px 0 2px}
 #mPv{width:72px;height:72px;border-radius:10px;object-fit:cover;background:var(--soft);flex:none}
 #mPhotoLbl{cursor:pointer;text-align:center}
+.day{display:flex;justify-content:space-between;gap:10px;padding:12px 0 6px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.inv{border-top:1px solid var(--line)}
+.invhead{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer}
+.invhead .t{font-weight:700;font-variant-numeric:tabular-nums}
+.invhead .c{flex:1;color:var(--muted);font-size:13.5px}
+.det{padding:0 0 12px}
+.drow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:14px;font-variant-numeric:tabular-nums}
+.drow .dn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.det .btn{margin-top:8px}
+#invSummary{font-size:15px}
+.dstamp{color:var(--muted);font-size:13px;padding-bottom:6px;direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
+.invhead .c{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -108,6 +120,7 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
 <nav>
   <button class="on" data-tab="sale">البيع</button>
   <button data-tab="prods">المنتوجات</button>
+  <button data-tab="inv">الفواتير</button>
 </nav>
 
 <section class="tab on" id="tab-sale">
@@ -159,12 +172,17 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
   </div>
   <div class="card"><div id="plist"></div></div>
 </section>
+
+<section class="tab" id="tab-inv">
+  <div class="card" id="invSummary" hidden></div>
+  <div class="card"><div id="ilist"></div></div>
+</section>
 </div>
 
 <div class="bar" id="bar">
   <div class="in">
     <div class="tot"><small id="totLabel">المجموع</small><b id="total">0 دج</b></div>
-    <button class="btn sec" id="btnClear">فاتورة جديدة</button>
+    <button class="btn sec" id="btnClear">حفظ وفاتورة جديدة</button>
   </div>
 </div>
 
@@ -208,11 +226,12 @@ textarea{min-height:90px;direction:ltr;font-size:13px}
 try{ document.documentElement.setAttribute('dir','rtl'); document.documentElement.setAttribute('lang','ar'); }catch(e){}
 
 /* ---------- التخزين ---------- */
-var KP='pos_products_v1', KC='pos_cart_v1';
+var KP='pos_products_v1', KC='pos_cart_v1', KI='pos_invoices_v1';
 function load(k,def){ try{ var v=JSON.parse(localStorage.getItem(k)); return v||def; }catch(e){ return def; } }
 function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 var products = load(KP,{});
 var cart     = load(KC,[]);
+var invoices = load(KI,[]);
 
 /* ---------- أدوات ---------- */
 function $(id){ return document.getElementById(id); }
@@ -287,7 +306,56 @@ $('cart').addEventListener('click',function(e){
 });
 $('btnClear').addEventListener('click',function(){
   if(!cart.length) return;
-  twoStep(this,'تأكيد؟',function(){ cart=[]; save(KC,cart); renderCart(); toast('فاتورة جديدة'); });
+  twoStep(this,'تأكيد الحفظ؟',function(){ saveInvoice(); cart=[]; save(KC,cart); renderCart(); renderInvoices(); toast('تحفظت الفاتورة'); });
+});
+
+/* ---------- الفواتير المحفوظة ---------- */
+function saveInvoice(){
+  var items=[], cnt=0;
+  cart.forEach(function(it){
+    var p=products[it.code]||{name:'',price:0};
+    items.push({code:it.code,name:p.name||'',price:p.price,qty:it.qty}); cnt+=it.qty;
+  });
+  invoices.unshift({id:Date.now(),t:Date.now(),items:items,count:cnt,total:total()});
+  save(KI,invoices);
+}
+function pad2(n){ return n<10?'0'+n:''+n; }
+function dayKey(t){ var d=new Date(t); return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear(); }
+function timeStr(t){ var d=new Date(t); return pad2(d.getHours())+':'+pad2(d.getMinutes()); }
+var openInv=null;
+function renderInvoices(){
+  var box=$('ilist'), sum=$('invSummary');
+  if(!invoices.length){
+    sum.hidden=true;
+    box.innerHTML='<div class="empty">ما كاين حتى فاتورة محفوظة.<br>كي تضغط «حفظ وفاتورة جديدة» في البيع، تتحفظ هنا.</div>';
+    return;
+  }
+  var all=0; invoices.forEach(function(v){ all+=v.total; });
+  sum.hidden=false; sum.textContent=invoices.length+' فاتورة — المجموع '+fmt(all);
+  var days={}, order=[];
+  invoices.forEach(function(v){ var k=dayKey(v.t); if(!days[k]){ days[k]=[]; order.push(k); } days[k].push(v); });
+  box.innerHTML=order.map(function(k){
+    var dt=0; days[k].forEach(function(v){ dt+=v.total; });
+    return '<div class="day"><span>'+k+'</span><span>'+fmt(dt)+'</span></div>'+days[k].map(function(v){
+      var h='<div class="inv" data-id="'+v.id+'"><div class="invhead"><span class="t">'+timeStr(v.t)+'</span><span class="c">'+dayKey(v.t)+' · '+v.count+' قطعة</span><span class="line">'+fmt(v.total)+'</span></div>';
+      if(openInv===v.id){
+        h+='<div class="det"><div class="dstamp">'+dayKey(v.t)+' — '+timeStr(v.t)+'</div>'+v.items.map(function(it){
+          return '<div class="drow"><span class="dn">'+esc(it.name||it.code)+'</span><span>'+it.qty+' × '+fmt(it.price)+'</span><span class="line">'+fmt(it.price*it.qty)+'</span></div>';
+        }).join('')+'<button class="btn red" data-del="'+v.id+'">حذف الفاتورة</button></div>';
+      }
+      return h+'</div>';
+    }).join('');
+  }).join('');
+}
+$('ilist').addEventListener('click',function(e){
+  var d=e.target.closest('button[data-del]');
+  if(d){
+    var did=+d.dataset.del;
+    twoStep(d,'اضغط مرة أخرى للحذف',function(){ invoices=invoices.filter(function(v){ return v.id!==did; }); save(KI,invoices); openInv=null; renderInvoices(); });
+    return;
+  }
+  var hd=e.target.closest('.invhead'); if(!hd) return;
+  var id=+hd.parentNode.dataset.id; openInv=(openInv===id)?null:id; renderInvoices();
 });
 
 /* ---------- معالجة الكود ---------- */
@@ -475,11 +543,11 @@ $('btnNewProd').addEventListener('click',function(){ openModal({code:'',isNew:tr
 
 /* ---------- نسخة احتياطية ---------- */
 $('btnExport').addEventListener('click',async function(){
-  var txt=JSON.stringify(products,null,2);
+  var txt=JSON.stringify({v:2,products:products,invoices:invoices},null,2);
   $('backupBox').hidden=false; $('backupText').value=txt;
   try{
     var dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
-    if(dl){ await dl.save({filename:'produits.json',data:txt}); toast('تحفظ الملف'); return; }
+    if(dl){ await dl.save({filename:'sauvegarde.json',data:txt}); toast('تحفظ الملف'); return; }
   }catch(e){}
   try{ await navigator.clipboard.writeText(txt); toast('تنسخ النص'); }catch(e){ $('backupText').select(); toast('انسخ النص لي ظهر'); }
 });
@@ -487,16 +555,35 @@ $('btnImport').addEventListener('click',function(){
   var box=$('backupBox');
   if(box.hidden || !$('backupText').value.trim()){ box.hidden=false; $('backupText').value=''; $('backupText').focus(); toast('الصق النص ثم اضغط استرجاع مرة أخرى'); return; }
   try{
-    var obj=JSON.parse($('backupText').value), n=0;
-    Object.keys(obj).forEach(function(c){
-      var p=obj[c];
+    var obj=JSON.parse($('backupText').value), n=0, ni=0;
+    var v2=!!(obj && obj.v===2 && obj.products);
+    var prods=v2?obj.products:obj;
+    Object.keys(prods).forEach(function(c){
+      var p=prods[c];
       if(p && typeof p.price==='number' && isFinite(p.price) && p.price>=0){
         var rec={name:String(p.name||'').slice(0,120),price:r2(p.price)};
         if(typeof p.img==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(p.img)) rec.img=p.img;
         products[norm(c)]=rec; n++;
       }
     });
-    save(KP,products); renderProducts(); renderCart(); toast('تسترجعو '+n+' منتوج');
+    if(v2 && Array.isArray(obj.invoices)){
+      var have={}; invoices.forEach(function(v){ have[v.id]=1; });
+      obj.invoices.forEach(function(v){
+        if(v && typeof v.id==='number' && typeof v.t==='number' && Array.isArray(v.items) && !have[v.id]){
+          var items=[], cnt=0, tt=0;
+          v.items.forEach(function(it){
+            if(it && typeof it.price==='number' && isFinite(it.price) && typeof it.qty==='number' && isFinite(it.qty) && it.qty>=1){
+              var q=Math.floor(it.qty);
+              items.push({code:String(it.code||'').slice(0,64),name:String(it.name||'').slice(0,120),price:r2(it.price),qty:q}); cnt+=q; tt+=it.price*q;
+            }
+          });
+          invoices.push({id:v.id,t:v.t,items:items,count:cnt,total:r2(tt)}); have[v.id]=1; ni++;
+        }
+      });
+      invoices.sort(function(a,b){ return b.t-a.t; });
+      save(KI,invoices); renderInvoices();
+    }
+    save(KP,products); renderProducts(); renderCart(); toast('تسترجعو '+n+' منتوج'+(ni?' و '+ni+' فاتورة':''));
   }catch(e){ toast('النص ماشي صحيح'); }
 });
 
@@ -508,10 +595,11 @@ document.querySelectorAll('nav button').forEach(function(b){
     $('bar').hidden = b.dataset.tab!=='sale';
     if(b.dataset.tab!=='sale' && live) stopLive();
     if(b.dataset.tab==='prods') renderProducts();
+    if(b.dataset.tab==='inv') renderInvoices();
   });
 });
 
-renderCart(); renderProducts();
+renderCart(); renderProducts(); renderInvoices();
 })();
 </script>
 <script>
